@@ -8,7 +8,7 @@ const map = new mapboxgl.Map({
     zoom: 2
 });
 map.on('load', function () {
-    let customlayer = new Custom.CustomRasterLayer({id: 'test', tiles: ['https://nova.criticalmass.com.au:453/mapserver?map=../maps/gfs/uvencode.v001.map&mode=tile&layers=windgl&tilemode=gmap&tile={x} {y} {z}.png']})
+    let customlayer = new Custom.TextureLayer({id: 'test', tiles: ['https://nova.criticalmass.com.au:453/mapserver?map=../maps/gfs/uvencode.v001.map&mode=tile&layers=windgl&tilemode=gmap&tile={x} {y} {z}.png']})
     map.addLayer(customlayer, 'ferry');
 });
 

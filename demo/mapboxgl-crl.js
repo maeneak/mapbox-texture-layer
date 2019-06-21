@@ -13962,64 +13962,104 @@ var Custom = (function (exports) {
         }
     }
 
-    class CustomRasterLayer {
+    class RasterTileSource {
         constructor(options) {
-            this.map = null;
-            this.source = null;
             this.id = options.id;
-            this.type = 'custom';
             this.tileUrls = options.tiles;
-            this.sourceName = null;
-            this.options = options;
+            this.tileSize = options.tileSize;
+            this.layer = options.layer;
+            this.onLayerRemove = this.onLayerRemove.bind(this);
+            this.NotifyTileUpdate = options.updates;
+            this.map = options.map;
+            this.gl = options.gl;
+            this.tiles = [];
             this.loadedTiles = [];
-            this.tileCount = 0;
+            this.visibleTileCount = 0;
+            this.init();
         }
-        _init() {
-            this.map.addSource(this.sourceName, { 'type': 'raster', 'tiles': this.tileUrls });
-            this.source = this.map.getSource(this.sourceName);
+        init() {
+            this.map.on('move', this.move.bind(this));
+            this.map.on('zoomend', this.zoom.bind(this));
 
+            this.map.addSource(this.id, { 'type': 'raster', 'tiles': this.tileUrls, tileSize: this.tileSize});
+            this.source = this.map.getSource(this.id);
             this.source.on('data', (e) => {
                 if (e.sourceDataType == 'content')
                     this.loadTiles();
             });
         }
+        onLayerRemove() {
+
+        }
+        move(e) {
+            this.loadTiles();
+        }
+        zoom(e) {
+            this.loadTiles();
+        }
         loadTiles() {
             const currentZoomLevel = this.map.getZoom();
             const flooredZoom = Math.floor(currentZoomLevel);
-        
+            
             let bounds = map.getBounds();
 
-            let tiles = tileCover(flooredZoom, [
+            let visibleTiles = tileCover(flooredZoom, [
                 MercatorCoordinate.fromLngLat(bounds.getSouthWest()),
                 MercatorCoordinate.fromLngLat(bounds.getNorthEast()),
                 MercatorCoordinate.fromLngLat(bounds.getNorthWest()),
                 MercatorCoordinate.fromLngLat(bounds.getSouthEast())
             ], flooredZoom, false );
-            this.tileCount = tiles.length;
+            this.visibleTileCount = visibleTiles.length;
 
-            tiles.forEach(tile => {
-                let inTile = new Tile(tile, this.source.tileSize);
-                this.source.loadTile(inTile, () => {
-                    this.tileLoaded(inTile);
-                });
+            visibleTiles.forEach(tile => {
+                let inTile = new Tile(tile, this.tileSize);
+                if (!this.tiles.find(x => x.tileID.equals(tile))) {
+                    inTile.posMatrix = this.map.painter.transform.calculatePosMatrix(tile.toUnwrapped());
+                    this.tiles.push(inTile);
+                    this.source.loadTile(inTile, () => this.tileLoaded(inTile));
+                }
             });
         }
         tileLoaded(tile) {
-            this.loadedTiles.push(tile);
+            tile.loaded = true;
+        }
+    }
+
+    class TextureLayer {
+        constructor(options) {
+            this.map = null;
+            this.gl = null;
+            this.source = null;
+            this.id = options.id;
+            this.type = 'custom';
+            this.tileUrls = options.tiles;
+            this.options = options;
         }
         onAdd(map, gl) {
             this.map = map;
             this.gl = gl;
-            this.sourceName = this.id + 'Source';
 
             this._init();
         }
+        _init() {
+            this.source = new RasterTileSource({
+                id: this.id + 'Source', 
+                tiles: this.tileUrls, 
+                updates: this.update, 
+                tileSize: this.options.tileSize ? this.options.tileSize : 256,
+                map: this.map,
+                gl: this.gl
+            });
+        }
+        update() {
+
+        }
         render(gl, matrix) {
-            
+            console.log(this.source.tiles.length + ' of ' + this.source.visibleTileCount);
         }
     }
 
-    exports.CustomRasterLayer = CustomRasterLayer;
+    exports.TextureLayer = TextureLayer;
 
     return exports;
 

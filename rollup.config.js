@@ -4,7 +4,7 @@ import {plugins} from './node_modules/mapbox-gl/build/rollup_plugins';
 import flowRemoveTypes from '@mapbox/flow-remove-types';
 
 export default [{
-    input: 'src/mapboxgl-crl.js',
+    input: 'src/TextureLayer.js',
     output: [{
       file: 'dist/mapboxgl-crl.js',
       format: 'cjs'
