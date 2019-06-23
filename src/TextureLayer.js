@@ -1,4 +1,4 @@
-import {RasterTileSource} from './RasterTileSource';
+import {TextureSource} from './TextureSource';
 import vertexSource from './shaders/raster.vert';
 import fragmentSource from './shaders/raster.frag';
 
@@ -17,7 +17,7 @@ export class TextureLayer {
         this.map = map;
         this.gl = gl;
 
-        this.source = new RasterTileSource({
+        this.source = new TextureSource({
             id: this.id + 'Source', 
             tiles: this.tileUrls, 
             updates: this.update, 
@@ -40,42 +40,29 @@ export class TextureLayer {
         gl.validateProgram(this.program);
 
         this.program.aPos = gl.getAttribLocation(this.program, "aPos");
-        this.program.aTexCoord = gl.getAttribLocation(this.program, "aTexCoord");
+        //this.program.aTexCoord = gl.getAttribLocation(this.program, "aTexCoord");
         this.program.uMatrix = gl.getUniformLocation(this.program, "uMatrix");
         this.program.uTexture = gl.getUniformLocation(this.program, "uTexture");
-        this.program.uPosMatrix = gl.getUniformLocation(this.program, "uPosMatrix");
-        this.program.uProjMatrix = gl.getUniformLocation(this.program, "uProjMatrix");
-        this.program.uPixelMatrix = gl.getUniformLocation(this.program, "uPixelMatrix");
 
         const vertexArray = new Float32Array([0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1]);
-        const indexArray = new Float32Array([
-            0, 0,
-            0, 1,
-            1, 0,
-            1, 0,
-            0, 1,
-            1, 1
-        ]);
 
         this.vertexBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, vertexArray, gl.STATIC_DRAW);
-        this.indexBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.indexBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, indexArray, gl.STATIC_DRAW);
-
     }
     update() {
 
     }
     render(gl, matrix) {
-        this.map.showTileBoundaries = true;
-        this.map.showCollisionBoxes = true;
-        //console.log(matrix);
+        //this.map.showTileBoundaries = true;
         gl.useProgram(this.program);
-        this.source.visibleTiles.filter(x => this.source.tiles[x.key].loaded).forEach(tileid => {
-            //console.log(tile.posMatrix);
-            let tile = this.source.tiles[tileid.key]
+
+        this.source.visibleTiles
+        //.filter(x => this.source.tileCache[x.key].textureLoaded)
+        .map(id => this.source.tileCache[id.key])
+        .forEach(tile => {
+            //let tile = this.source.tileCache[tileid.key]
+            if (!tile.textureLoaded) return;
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, tile.texture.texture);
 
@@ -88,10 +75,7 @@ export class TextureLayer {
             gl.enableVertexAttribArray(this.program.a_pos);
             gl.vertexAttribPointer(this.program.aPos, 2, gl.FLOAT, false, 0, 0);
 
-            gl.uniformMatrix4fv(this.program.uMatrix, false, matrix);
-            gl.uniformMatrix4fv(this.program.uPosMatrix, false, new Float32Array(tile.posMatrix));
-            gl.uniformMatrix4fv(this.program.uProjMatrix, false, this.map.painter.transform.projMatrix);
-            gl.uniformMatrix4fv(this.program.uPixelMatrix, false, this.map.painter.transform.pixelMatrix);
+            gl.uniformMatrix4fv(this.program.uMatrix, false, tile.posMatrix);
             gl.uniform1i(this.program.uTexture, 0);
             gl.enable(gl.BLEND);
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);

@@ -13963,42 +13963,55 @@ class Tile {
     }
 }
 
-class RasterTileSource {
+class Tile$1 extends Tile {
+    constructor(OverscaledTileID, source, cbTextureLoaded) {
+        super(OverscaledTileID, source.tileSize);
+        this.source = source;
+        this.map = source.map;
+        this.posMatrix = map.painter.transform.calculatePosMatrix(this.tileID.toUnwrapped(), true);
+        this.key = () => {this.tileID.canonical.key;};
+        source.loadTile(this, () => {
+            this.textureLoaded = true;
+            cbTextureLoaded();
+        });
+    }
+}
+
+class TextureSource {
     constructor(options) {
         this.id = options.id;
         this.tileUrls = options.tiles;
         this.tileSize = options.tileSize;
         this.layer = options.layer;
-        this.onLayerRemove = this.onLayerRemove.bind(this);
         this.NotifyTileUpdate = options.updates;
         this.map = options.map;
         this.gl = options.gl;
-        this.tiles = [];
+        this.tileCache = [];
         this.loadedTiles = [];
         this.visibleTileCount = 0;
-        this.init();
-    }
-    init() {
-        this.map.on('moveend', this.move.bind(this));
-        //this.map.on('zoom', this.zoom.bind(this));
 
+        this.map.on('move', this.move.bind(this));
+        this.map.on('zoom', this.zoom.bind(this));
         this.map.addSource(this.id, { 'type': 'raster', 'tiles': this.tileUrls, tileSize: this.tileSize});
         this.source = this.map.getSource(this.id);
-        this.source.on('data', (e) => {
-            if (e.sourceDataType == 'content')
-                this.loadTiles();
-        });
+        this.source.on('data', this.onData.bind(this));
     }
-    onLayerRemove() {
+    onData(e) {
+        if (e.sourceDataType == 'content')
+            this.updateTiles();
+        else if (e.sourceDataType == 'metadata')
+            console.log(e);
+    }
+    onRemove() {
 
     }
     move(e) {
-        this.loadTiles();
+        this.updateTiles();
     }
     zoom(e) {
-        this.loadTiles();
+        this.updateTiles();
     }
-    loadTiles() {
+    updateTiles() {
         const currentZoomLevel = this.map.getZoom();
         const flooredZoom = Math.floor(currentZoomLevel);
     
@@ -14012,24 +14025,19 @@ class RasterTileSource {
 
         this.visibleTileCount = this.visibleTiles.length;
 
-        this.visibleTiles.forEach(tile => {
-            let existingTile = this.tiles.find(x => x.tileID.equals(tile));
-            let inTile = existingTile ? existingTile : new Tile(tile, this.tileSize);
-            //inTile.posMatrix = calculatePosMatrix(tile.toUnwrapped(), currentScale, this.map, this.tileSize);
-            inTile.posMatrix = this.map.painter.transform.calculatePosMatrix(tile.toUnwrapped());
-            //inTile.posMatrix = this.map.painter.translatePosMatrix(inTile.posMatrix, inTile, [8192,8192], 'map')
-            if (!existingTile) {
-                this.tiles[tile.key] = inTile;
-                this.source.loadTile(inTile, () => this.tileLoaded(inTile));
-            }
+        this.visibleTiles
+        .filter(id => !this.tileCache[id.key])
+        .forEach(tile => {
+            this.tileCache[tile.key] = new Tile$1(tile, this.source, this.tileLoaded);
         });
+        this.map.triggerRepaint();
     }
     tileLoaded(tile) {
-        tile.loaded = true;
+        //tile.loaded = true;
     }
 }
 
-var vertexSource = "#define GLSLIFY 1\nattribute vec2 aPos;\n//attribute vec2 aTexCoord;\nuniform mat4 uMatrix;\nuniform mat4 uProjMatrix;\nuniform mat4 uPixelMatrix;\nuniform mat4 uPosMatrix;\nvarying vec2 vTexCoord;\n\nfloat Extent = 8192.0;\n\nvec4 toScreen(vec2 pos) { return vec4(pos.x * Extent, pos.y * Extent, 0, 1); }\n\nvoid main() {\n    vec4 a = uPosMatrix * toScreen(aPos);\n    gl_Position = vec4(a.rgba);\n    vTexCoord = aPos;\n}\n"; // eslint-disable-line
+var vertexSource = "#define GLSLIFY 1\nattribute vec2 aPos;\nuniform mat4 uMatrix;\nvarying vec2 vTexCoord;\n\nfloat Extent = 8192.0;\n\nvec4 toScreen(vec2 pos) { return vec4(pos.x * Extent, pos.y * Extent, 0, 1); }\n\nvoid main() {\n    vec4 a = uMatrix * toScreen(aPos);\n    gl_Position = vec4(a.rgba);\n    vTexCoord = aPos;\n}\n"; // eslint-disable-line
 
 var fragmentSource = "precision mediump float;\n#define GLSLIFY 1\nvarying vec2 vTexCoord;\nuniform sampler2D uTexture;\nvoid main() {\n    vec4 color = texture2D(uTexture, vTexCoord);\n\n    gl_FragColor = color;// vec4(.5,.5,.5,1);\n}           \n"; // eslint-disable-line
 
@@ -14048,7 +14056,7 @@ class TextureLayer {
         this.map = map;
         this.gl = gl;
 
-        this.source = new RasterTileSource({
+        this.source = new TextureSource({
             id: this.id + 'Source', 
             tiles: this.tileUrls, 
             updates: this.update, 
@@ -14071,42 +14079,29 @@ class TextureLayer {
         gl.validateProgram(this.program);
 
         this.program.aPos = gl.getAttribLocation(this.program, "aPos");
-        this.program.aTexCoord = gl.getAttribLocation(this.program, "aTexCoord");
+        //this.program.aTexCoord = gl.getAttribLocation(this.program, "aTexCoord");
         this.program.uMatrix = gl.getUniformLocation(this.program, "uMatrix");
         this.program.uTexture = gl.getUniformLocation(this.program, "uTexture");
-        this.program.uPosMatrix = gl.getUniformLocation(this.program, "uPosMatrix");
-        this.program.uProjMatrix = gl.getUniformLocation(this.program, "uProjMatrix");
-        this.program.uPixelMatrix = gl.getUniformLocation(this.program, "uPixelMatrix");
 
         const vertexArray = new Float32Array([0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1]);
-        const indexArray = new Float32Array([
-            0, 0,
-            0, 1,
-            1, 0,
-            1, 0,
-            0, 1,
-            1, 1
-        ]);
 
         this.vertexBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, vertexArray, gl.STATIC_DRAW);
-        this.indexBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.indexBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, indexArray, gl.STATIC_DRAW);
-
     }
     update() {
 
     }
     render(gl, matrix) {
-        this.map.showTileBoundaries = true;
-        this.map.showCollisionBoxes = true;
-        //console.log(matrix);
+        //this.map.showTileBoundaries = true;
         gl.useProgram(this.program);
-        this.source.visibleTiles.filter(x => this.source.tiles[x.key].loaded).forEach(tileid => {
-            //console.log(tile.posMatrix);
-            let tile = this.source.tiles[tileid.key];
+
+        this.source.visibleTiles
+        //.filter(x => this.source.tileCache[x.key].textureLoaded)
+        .map(id => this.source.tileCache[id.key])
+        .forEach(tile => {
+            //let tile = this.source.tileCache[tileid.key]
+            if (!tile.textureLoaded) return;
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, tile.texture.texture);
 
@@ -14119,10 +14114,7 @@ class TextureLayer {
             gl.enableVertexAttribArray(this.program.a_pos);
             gl.vertexAttribPointer(this.program.aPos, 2, gl.FLOAT, false, 0, 0);
 
-            gl.uniformMatrix4fv(this.program.uMatrix, false, matrix);
-            gl.uniformMatrix4fv(this.program.uPosMatrix, false, new Float32Array(tile.posMatrix));
-            gl.uniformMatrix4fv(this.program.uProjMatrix, false, this.map.painter.transform.projMatrix);
-            gl.uniformMatrix4fv(this.program.uPixelMatrix, false, this.map.painter.transform.pixelMatrix);
+            gl.uniformMatrix4fv(this.program.uMatrix, false, tile.posMatrix);
             gl.uniform1i(this.program.uTexture, 0);
             gl.enable(gl.BLEND);
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
