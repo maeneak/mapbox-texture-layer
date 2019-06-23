@@ -59,9 +59,9 @@ export class TextureLayer {
 
         this.source.visibleTiles
         //.filter(x => this.source.tileCache[x.key].textureLoaded)
-        .map(id => this.source.tileCache[id.key])
-        .forEach(tile => {
-            //let tile = this.source.tileCache[tileid.key]
+        //.map(id => this.source.tileCache[id.canonical.key])
+        .forEach(tileid => {
+            let tile = this.source.tileCache[tileid.canonical.key]
             if (!tile.textureLoaded) return;
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, tile.texture.texture);
@@ -75,10 +75,11 @@ export class TextureLayer {
             gl.enableVertexAttribArray(this.program.a_pos);
             gl.vertexAttribPointer(this.program.aPos, 2, gl.FLOAT, false, 0, 0);
 
-            gl.uniformMatrix4fv(this.program.uMatrix, false, tile.posMatrix);
+            gl.uniformMatrix4fv(this.program.uMatrix, false, this.source.matrixCache[tileid.key]);
             gl.uniform1i(this.program.uTexture, 0);
-            gl.enable(gl.BLEND);
-            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+            gl.depthFunc(gl.LESS);
+            //gl.enable(gl.BLEND);
+            //gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
             gl.drawArrays(gl.TRIANGLES, 0, 6);
 
         });

@@ -1,7 +1,6 @@
 import tileCover from 'mapbox-gl/src/util/tile_cover';
 import MercatorCoordinate from 'mapbox-gl/src/geo/mercator_coordinate';
 import {Tile} from './Tile';
-import {calculatePosMatrix } from './transform';
 
 function zoomToScale(zoom) {
     return Math.pow(2, zoom);
@@ -17,7 +16,7 @@ export class TextureSource {
         this.map = options.map;
         this.gl = options.gl;
         this.tileCache = [];
-        this.loadedTiles = [];
+        this.matrixCache = [];
         this.visibleTileCount = 0;
 
         this.map.on('move', this.move.bind(this));
@@ -39,7 +38,7 @@ export class TextureSource {
         this.updateTiles();
     }
     zoom(e) {
-        this.updateTiles();
+        //this.updateTiles();
     }
     updateTiles() {
         const currentZoomLevel = this.map.getZoom();
@@ -57,13 +56,13 @@ export class TextureSource {
         this.visibleTileCount = this.visibleTiles.length;
 
         this.visibleTiles
-        .filter(id => !this.tileCache[id.key])
-        .forEach(tile => {
-            this.tileCache[tile.key] = new Tile(tile, this.source, this.tileLoaded)
+        .forEach(tileid => {
+            if (!this.tileCache[tileid.canonical.key])
+                this.tileCache[tileid.canonical.key] = new Tile(tileid, this.source, this.tileLoaded.bind(this));
+            this.matrixCache[tileid.key] = map.painter.transform.calculatePosMatrix(tileid.toUnwrapped(), !this.map.painter.options.moving)
         });
-        this.map.triggerRepaint();
     }
-    tileLoaded(tile) {
-        //tile.loaded = true;
+    tileLoaded() {
+        this.map.triggerRepaint();
     }
 }

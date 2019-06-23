@@ -13967,7 +13967,7 @@ var Custom = (function (exports) {
             super(OverscaledTileID, source.tileSize);
             this.source = source;
             this.map = source.map;
-            this.posMatrix = map.painter.transform.calculatePosMatrix(this.tileID.toUnwrapped(), true);
+            //this.posMatrix = () => map.painter.transform.calculatePosMatrix(this.tileID.toUnwrapped(), true);
             this.key = () => {this.tileID.canonical.key;};
             source.loadTile(this, () => {
                 this.textureLoaded = true;
@@ -13986,7 +13986,7 @@ var Custom = (function (exports) {
             this.map = options.map;
             this.gl = options.gl;
             this.tileCache = [];
-            this.loadedTiles = [];
+            this.matrixCache = [];
             this.visibleTileCount = 0;
 
             this.map.on('move', this.move.bind(this));
@@ -14008,7 +14008,7 @@ var Custom = (function (exports) {
             this.updateTiles();
         }
         zoom(e) {
-            this.updateTiles();
+            //this.updateTiles();
         }
         updateTiles() {
             const currentZoomLevel = this.map.getZoom();
@@ -14025,14 +14025,14 @@ var Custom = (function (exports) {
             this.visibleTileCount = this.visibleTiles.length;
 
             this.visibleTiles
-            .filter(id => !this.tileCache[id.key])
-            .forEach(tile => {
-                this.tileCache[tile.key] = new Tile$1(tile, this.source, this.tileLoaded);
+            .forEach(tileid => {
+                if (!this.tileCache[tileid.canonical.key])
+                    this.tileCache[tileid.canonical.key] = new Tile$1(tileid, this.source, this.tileLoaded.bind(this));
+                this.matrixCache[tileid.key] = map.painter.transform.calculatePosMatrix(tileid.toUnwrapped(), !this.map.painter.options.moving);
             });
-            this.map.triggerRepaint();
         }
-        tileLoaded(tile) {
-            //tile.loaded = true;
+        tileLoaded() {
+            this.map.triggerRepaint();
         }
     }
 
@@ -14097,9 +14097,9 @@ var Custom = (function (exports) {
 
             this.source.visibleTiles
             //.filter(x => this.source.tileCache[x.key].textureLoaded)
-            .map(id => this.source.tileCache[id.key])
-            .forEach(tile => {
-                //let tile = this.source.tileCache[tileid.key]
+            //.map(id => this.source.tileCache[id.canonical.key])
+            .forEach(tileid => {
+                let tile = this.source.tileCache[tileid.canonical.key];
                 if (!tile.textureLoaded) return;
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, tile.texture.texture);
@@ -14113,10 +14113,11 @@ var Custom = (function (exports) {
                 gl.enableVertexAttribArray(this.program.a_pos);
                 gl.vertexAttribPointer(this.program.aPos, 2, gl.FLOAT, false, 0, 0);
 
-                gl.uniformMatrix4fv(this.program.uMatrix, false, tile.posMatrix);
+                gl.uniformMatrix4fv(this.program.uMatrix, false, this.source.matrixCache[tileid.key]);
                 gl.uniform1i(this.program.uTexture, 0);
-                gl.enable(gl.BLEND);
-                gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+                gl.depthFunc(gl.LESS);
+                //gl.enable(gl.BLEND);
+                //gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
                 gl.drawArrays(gl.TRIANGLES, 0, 6);
 
             });
