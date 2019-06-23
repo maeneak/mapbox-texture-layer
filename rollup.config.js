@@ -2,6 +2,7 @@ import resolve from 'rollup-plugin-node-resolve';
 import commonjs from 'rollup-plugin-commonjs';
 import {plugins} from './node_modules/mapbox-gl/build/rollup_plugins';
 import flowRemoveTypes from '@mapbox/flow-remove-types';
+import glslify from 'rollup-plugin-glslify';
 
 export default [{
     input: 'src/TextureLayer.js',
@@ -23,7 +24,8 @@ export default [{
           // global keyword handling causes Webpack compatibility issues, so we disabled it:
           // https://github.com/mapbox/mapbox-gl-js/pull/6956
           ignoreGlobal: true
-      })
+      }),
+      glslify({ basedir: 'src/shaders' })
     ]
   }]
 

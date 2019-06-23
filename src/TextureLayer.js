@@ -1,5 +1,7 @@
 import {RasterTileSource} from './RasterTileSource';
-  
+import vertexSource from './shaders/raster.vert';
+import fragmentSource from './shaders/raster.frag';
+
 export class TextureLayer {
     constructor(options) {
         this.map = null;
@@ -23,21 +25,6 @@ export class TextureLayer {
             map: this.map,
             gl: this.gl
         });
-        const vertexSource = `
-        attribute vec3 aPos;
-        uniform mat4 uMatrix;
-        uniform mat4 uPosMatrix;
-
-        void main() {
-            gl_Position = uMatrix * uPosMatrix * vec4(aPos, 1.0);
-        }
-        `;
-
-        const fragmentSource = `
-        void main() {
-            gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
-        }
-        `;
 
         const vertexShader = gl.createShader(gl.VERTEX_SHADER);
         gl.shaderSource(vertexShader, vertexSource);
@@ -53,22 +40,14 @@ export class TextureLayer {
         gl.validateProgram(this.program);
 
         this.program.aPos = gl.getAttribLocation(this.program, "aPos");
+        this.program.aTexCoord = gl.getAttribLocation(this.program, "aTexCoord");
         this.program.uMatrix = gl.getUniformLocation(this.program, "uMatrix");
+        this.program.uTexture = gl.getUniformLocation(this.program, "uTexture");
         this.program.uPosMatrix = gl.getUniformLocation(this.program, "uPosMatrix");
+        this.program.uProjMatrix = gl.getUniformLocation(this.program, "uProjMatrix");
+        this.program.uPixelMatrix = gl.getUniformLocation(this.program, "uPixelMatrix");
 
-        const x = 0.5;
-        const y = 0.5;
-        const z = 0.125;
-        const d = 0.125;
-
-        const vertexArray = new Float32Array([
-            0, 0,
-            0, 1,
-            1, 0,
-            1, 0,
-            0, 1,
-            1, 1
-        ]);
+        const vertexArray = new Float32Array([0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1]);
         const indexArray = new Float32Array([
             0, 0,
             0, 1,
@@ -90,24 +69,34 @@ export class TextureLayer {
 
     }
     render(gl, matrix) {
-        if (this.source.tiles.length) {
-            let tile = this.source.tiles[0];
-            gl.useProgram(this.program);
-
+        this.map.showTileBoundaries = true;
+        this.map.showCollisionBoxes = true;
+        //console.log(matrix);
+        gl.useProgram(this.program);
+        this.source.visibleTiles.filter(x => this.source.tiles[x.key].loaded).forEach(tileid => {
+            //console.log(tile.posMatrix);
+            let tile = this.source.tiles[tileid.key]
+            gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, tile.texture.texture);
+
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-            //gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+          
             gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
-            gl.bindBuffer(gl.ARRAY_BUFFER, this.indexBuffer);
             gl.enableVertexAttribArray(this.program.a_pos);
-            gl.vertexAttribPointer(this.program.aPos, 3, gl.FLOAT, false, 0, 0);
+            gl.vertexAttribPointer(this.program.aPos, 2, gl.FLOAT, false, 0, 0);
+
             gl.uniformMatrix4fv(this.program.uMatrix, false, matrix);
-            gl.uniformMatrix4fv(this.program.uPosMatrix, false, tile.posMatrix);
+            gl.uniformMatrix4fv(this.program.uPosMatrix, false, new Float32Array(tile.posMatrix));
+            gl.uniformMatrix4fv(this.program.uProjMatrix, false, this.map.painter.transform.projMatrix);
+            gl.uniformMatrix4fv(this.program.uPixelMatrix, false, this.map.painter.transform.pixelMatrix);
+            gl.uniform1i(this.program.uTexture, 0);
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
             gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-        }
+        });
     }
 }

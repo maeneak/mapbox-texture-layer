@@ -13979,8 +13979,8 @@ class RasterTileSource {
         this.init();
     }
     init() {
-        this.map.on('move', this.move.bind(this));
-        this.map.on('zoomend', this.zoom.bind(this));
+        this.map.on('moveend', this.move.bind(this));
+        //this.map.on('zoomend', this.zoom.bind(this));
 
         this.map.addSource(this.id, { 'type': 'raster', 'tiles': this.tileUrls, tileSize: this.tileSize});
         this.source = this.map.getSource(this.id);
@@ -14001,22 +14001,25 @@ class RasterTileSource {
     loadTiles() {
         const currentZoomLevel = this.map.getZoom();
         const flooredZoom = Math.floor(currentZoomLevel);
-        
-        let bounds = map.getBounds();
+    
+        const bounds = this.map.getBounds();
+        this.visibleTiles = tileCover(flooredZoom, [
+          MercatorCoordinate.fromLngLat(bounds.getSouthWest()),
+          MercatorCoordinate.fromLngLat(bounds.getNorthEast()),
+          MercatorCoordinate.fromLngLat(bounds.getNorthWest()),
+          MercatorCoordinate.fromLngLat(bounds.getSouthEast())
+        ], currentZoomLevel, true);
 
-        let visibleTiles = tileCover(flooredZoom, [
-            MercatorCoordinate.fromLngLat(bounds.getSouthWest()),
-            MercatorCoordinate.fromLngLat(bounds.getNorthEast()),
-            MercatorCoordinate.fromLngLat(bounds.getNorthWest()),
-            MercatorCoordinate.fromLngLat(bounds.getSouthEast())
-        ], flooredZoom, false );
-        this.visibleTileCount = visibleTiles.length;
+        this.visibleTileCount = this.visibleTiles.length;
 
-        visibleTiles.forEach(tile => {
-            let inTile = new Tile(tile, this.tileSize);
-            if (!this.tiles.find(x => x.tileID.equals(tile))) {
-                inTile.posMatrix = this.map.painter.transform.calculatePosMatrix(tile.toUnwrapped());
-                this.tiles.push(inTile);
+        this.visibleTiles.forEach(tile => {
+            let existingTile = this.tiles.find(x => x.tileID.equals(tile));
+            let inTile = existingTile ? existingTile : new Tile(tile, this.tileSize);
+            //inTile.posMatrix = calculatePosMatrix(tile.toUnwrapped(), currentScale, this.map, this.tileSize);
+            inTile.posMatrix = this.map.painter.transform.calculatePosMatrix(tile.toUnwrapped());
+            //inTile.posMatrix = this.map.painter.translatePosMatrix(inTile.posMatrix, inTile, [8192,8192], 'map')
+            if (!existingTile) {
+                this.tiles[tile.key] = inTile;
                 this.source.loadTile(inTile, () => this.tileLoaded(inTile));
             }
         });
@@ -14026,6 +14029,10 @@ class RasterTileSource {
     }
 }
 
+var vertexSource = "#define GLSLIFY 1\nattribute vec2 aPos;\n//attribute vec2 aTexCoord;\nuniform mat4 uMatrix;\nuniform mat4 uProjMatrix;\nuniform mat4 uPixelMatrix;\nuniform mat4 uPosMatrix;\nvarying vec2 vTexCoord;\n\nvoid main() {\n    vec4 a = uMatrix * vec4(aPos, 0, 1);\n    gl_Position = vec4(a.rgba);\n    vTexCoord = aPos;\n}\n"; // eslint-disable-line
+
+var fragmentSource = "precision mediump float;\n#define GLSLIFY 1\nvarying vec2 vTexCoord;\nuniform sampler2D uTexture;\nvoid main() {\n    vec4 color = texture2D(uTexture, vTexCoord);\n\n    gl_FragColor = color;// vec4(.5,.5,.5,1);\n}           \n"; // eslint-disable-line
+
 class TextureLayer {
     constructor(options) {
         this.map = null;
@@ -14034,15 +14041,13 @@ class TextureLayer {
         this.id = options.id;
         this.type = 'custom';
         this.tileUrls = options.tiles;
+        this.program = null;
         this.options = options;
     }
     onAdd(map, gl) {
         this.map = map;
         this.gl = gl;
 
-        this._init();
-    }
-    _init() {
         this.source = new RasterTileSource({
             id: this.id + 'Source', 
             tiles: this.tileUrls, 
@@ -14051,12 +14056,79 @@ class TextureLayer {
             map: this.map,
             gl: this.gl
         });
+
+        const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+        gl.shaderSource(vertexShader, vertexSource);
+        gl.compileShader(vertexShader);
+        const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(fragmentShader, fragmentSource);
+        gl.compileShader(fragmentShader);
+
+        this.program = gl.createProgram();
+        gl.attachShader(this.program, vertexShader);
+        gl.attachShader(this.program, fragmentShader);
+        gl.linkProgram(this.program);
+        gl.validateProgram(this.program);
+
+        this.program.aPos = gl.getAttribLocation(this.program, "aPos");
+        this.program.aTexCoord = gl.getAttribLocation(this.program, "aTexCoord");
+        this.program.uMatrix = gl.getUniformLocation(this.program, "uMatrix");
+        this.program.uTexture = gl.getUniformLocation(this.program, "uTexture");
+        this.program.uPosMatrix = gl.getUniformLocation(this.program, "uPosMatrix");
+        this.program.uProjMatrix = gl.getUniformLocation(this.program, "uProjMatrix");
+        this.program.uPixelMatrix = gl.getUniformLocation(this.program, "uPixelMatrix");
+
+        const vertexArray = new Float32Array([0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1]);
+        const indexArray = new Float32Array([
+            0, 0,
+            0, 1,
+            1, 0,
+            1, 0,
+            0, 1,
+            1, 1
+        ]);
+
+        this.vertexBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, vertexArray, gl.STATIC_DRAW);
+        this.indexBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.indexBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, indexArray, gl.STATIC_DRAW);
+
     }
     update() {
 
     }
     render(gl, matrix) {
-        console.log(this.source.tiles.length + ' of ' + this.source.visibleTileCount);
+        this.map.showTileBoundaries = true;
+        this.map.showCollisionBoxes = true;
+        //console.log(matrix);
+        gl.useProgram(this.program);
+        this.source.visibleTiles.filter(x => this.source.tiles[x.key].loaded).forEach(tileid => {
+            //console.log(tile.posMatrix);
+            let tile = this.source.tiles[tileid.key];
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, tile.texture.texture);
+
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+          
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
+            gl.enableVertexAttribArray(this.program.a_pos);
+            gl.vertexAttribPointer(this.program.aPos, 2, gl.FLOAT, false, 0, 0);
+
+            gl.uniformMatrix4fv(this.program.uMatrix, false, matrix);
+            gl.uniformMatrix4fv(this.program.uPosMatrix, false, new Float32Array(tile.posMatrix));
+            gl.uniformMatrix4fv(this.program.uProjMatrix, false, this.map.painter.transform.projMatrix);
+            gl.uniformMatrix4fv(this.program.uPixelMatrix, false, this.map.painter.transform.pixelMatrix);
+            gl.uniform1i(this.program.uTexture, 0);
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+        });
     }
 }
 
