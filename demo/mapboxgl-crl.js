@@ -13979,7 +13979,7 @@ var Custom = (function (exports) {
         }
         init() {
             this.map.on('moveend', this.move.bind(this));
-            //this.map.on('zoomend', this.zoom.bind(this));
+            //this.map.on('zoom', this.zoom.bind(this));
 
             this.map.addSource(this.id, { 'type': 'raster', 'tiles': this.tileUrls, tileSize: this.tileSize});
             this.source = this.map.getSource(this.id);
@@ -14028,7 +14028,7 @@ var Custom = (function (exports) {
         }
     }
 
-    var vertexSource = "#define GLSLIFY 1\nattribute vec2 aPos;\n//attribute vec2 aTexCoord;\nuniform mat4 uMatrix;\nuniform mat4 uProjMatrix;\nuniform mat4 uPixelMatrix;\nuniform mat4 uPosMatrix;\nvarying vec2 vTexCoord;\n\nvoid main() {\n    vec4 a = uMatrix * vec4(aPos, 0, 1);\n    gl_Position = vec4(a.rgba);\n    vTexCoord = aPos;\n}\n"; // eslint-disable-line
+    var vertexSource = "#define GLSLIFY 1\nattribute vec2 aPos;\n//attribute vec2 aTexCoord;\nuniform mat4 uMatrix;\nuniform mat4 uProjMatrix;\nuniform mat4 uPixelMatrix;\nuniform mat4 uPosMatrix;\nvarying vec2 vTexCoord;\n\nfloat Extent = 8192.0;\n\nvec4 toScreen(vec2 pos) { return vec4(pos.x * Extent, pos.y * Extent, 0, 1); }\n\nvoid main() {\n    vec4 a = uPosMatrix * toScreen(aPos);\n    gl_Position = vec4(a.rgba);\n    vTexCoord = aPos;\n}\n"; // eslint-disable-line
 
     var fragmentSource = "precision mediump float;\n#define GLSLIFY 1\nvarying vec2 vTexCoord;\nuniform sampler2D uTexture;\nvoid main() {\n    vec4 color = texture2D(uTexture, vTexCoord);\n\n    gl_FragColor = color;// vec4(.5,.5,.5,1);\n}           \n"; // eslint-disable-line
 

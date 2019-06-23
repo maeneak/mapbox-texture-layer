@@ -24,7 +24,7 @@ export class RasterTileSource {
     }
     init() {
         this.map.on('moveend', this.move.bind(this));
-        //this.map.on('zoomend', this.zoom.bind(this));
+        //this.map.on('zoom', this.zoom.bind(this));
 
         this.map.addSource(this.id, { 'type': 'raster', 'tiles': this.tileUrls, tileSize: this.tileSize});
         this.source = this.map.getSource(this.id);
