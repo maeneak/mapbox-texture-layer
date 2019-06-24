@@ -6,33 +6,18 @@ var vertexSource = "#define GLSLIFY 1\nattribute vec2 aPos;\nuniform mat4 uMatri
 
 var fragmentSource = "precision mediump float;\n#define GLSLIFY 1\nvarying vec2 vTexCoord;\nuniform sampler2D uTexture;\nvoid main() {\n    vec4 color = texture2D(uTexture, vTexCoord);\n\n    gl_FragColor = vec4(1.0 - color.r, 1.0 - color.g, 1.0 - color.b, 1);\n}           \n"; // eslint-disable-line
 
-//import {TextureSource} from './TextureSource';
-
 class TextureLayer {
     constructor(id, tileJson, renderCallback, preRenderCallback) {
         this.map = null;
         this.gl = null;
         this.id = id;
-        this.textureSource = null;
+        this.tileSource = null;
         this.source = this.id + 'Source';
         this.type = 'custom';
         this.tileJson = tileJson;
         this.program = null;
         this.renderCallback = renderCallback;
         this.preRenderCallback = preRenderCallback;
-    }
-    move(e) {
-        this.updateTiles();
-    }
-    zoom(e) {
-
-    }
-    onData(e) {
-        if (e.sourceDataType == 'content')
-            this.updateTiles();
-    }
-    updateTiles() {
-        this.sourceCache.update(this.map.painter.transform);
     }
     onAdd(map, gl) {
         this.map = map;
@@ -41,11 +26,11 @@ class TextureLayer {
         map.on('zoom', this.zoom.bind(this));
 
         map.addSource(this.source, this.tileJson);
-        this.textureSource = this.map.getSource(this.source);
-        this.textureSource.on('data', this.onData.bind(this));
+        this.tileSource = this.map.getSource(this.source);
+        this.tileSource.on('data', this.onData.bind(this));
         this.sourceCache = this.map.style.sourceCaches[this.source];
 
-        // !IMPORTANT! hack to make mapbox mark the sourceCache as 'used' so we can use it.
+        // !IMPORTANT! hack to make mapbox mark the sourceCache as 'used' so it will initialise tiles.
         this.map.style._layers[this.id].source = this.source;
 
         const vertexShader = gl.createShader(gl.VERTEX_SHADER);
@@ -71,6 +56,19 @@ class TextureLayer {
         this.vertexBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, vertexArray, gl.STATIC_DRAW);
+    }
+    move(e) {
+        this.updateTiles();
+    }
+    zoom(e) {
+
+    }
+    onData(e) {
+        if (e.sourceDataType == 'content')
+            this.updateTiles();
+    }
+    updateTiles() {
+        this.sourceCache.update(this.map.painter.transform);
     }
     render(gl, matrix) {
         gl.useProgram(this.program);
