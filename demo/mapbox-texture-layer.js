@@ -1,52 +1,21 @@
-var Custom = (function (exports) {
-    'use strict';
-
-    class TextureSource {
-        constructor(id, tileJson, map, gl) {
-            this.id = id;
-            this.tileJson = tileJson;
-            this.map = map;
-            this.gl = gl;
-
-            this.map.on('move', this.move.bind(this));
-            this.map.on('zoom', this.zoom.bind(this));
-
-            this.map.addSource(this.id, tileJson);
-            this.source = this.map.getSource(this.id);
-            this.source.on('data', this.onData.bind(this));
-            this.sourceCache = this.map.style.sourceCaches[this.id];
-        }
-        onData(e) {
-            if (e.sourceDataType == 'content')
-                this.updateTiles();
-        }
-        onRemove() {
-
-        }
-        move(e) {
-            this.updateTiles();
-        }
-        zoom(e) {
-            //this.updateTiles();
-        }
-        updateTiles() {
-            this.sourceCache.update(this.map.painter.transform);
-        }
-        tileLoaded() {
-            this.map.triggerRepaint();
-        }
-    }
+(function (global, factory) {
+    typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
+    typeof define === 'function' && define.amd ? define(['exports'], factory) :
+    (global = global || self, factory(global.mapboxgl = global.mapboxgl || {}));
+}(this, function (exports) { 'use strict';
 
     var vertexSource = "#define GLSLIFY 1\nattribute vec2 aPos;\nuniform mat4 uMatrix;\nvarying vec2 vTexCoord;\n\nfloat Extent = 8192.0;\n\nvec4 toScreen(vec2 pos) { return vec4(pos.x * Extent, pos.y * Extent, 0, 1); }\n\nvoid main() {\n    vec4 a = uMatrix * toScreen(aPos);\n    gl_Position = vec4(a.rgba);\n    vTexCoord = aPos;\n}\n"; // eslint-disable-line
 
     var fragmentSource = "precision mediump float;\n#define GLSLIFY 1\nvarying vec2 vTexCoord;\nuniform sampler2D uTexture;\nvoid main() {\n    vec4 color = texture2D(uTexture, vTexCoord);\n\n    gl_FragColor = vec4(1.0 - color.r, 1.0 - color.g, 1.0 - color.b, 1);\n}           \n"; // eslint-disable-line
 
+    //import {TextureSource} from './TextureSource';
+
     class TextureLayer {
         constructor(id, tileJson, renderCallback, preRenderCallback) {
             this.map = null;
             this.gl = null;
-            this.textureSource = null;
             this.id = id;
+            this.textureSource = null;
             this.source = this.id + 'Source';
             this.type = 'custom';
             this.tileJson = tileJson;
@@ -54,10 +23,29 @@ var Custom = (function (exports) {
             this.renderCallback = renderCallback;
             this.preRenderCallback = preRenderCallback;
         }
+        move(e) {
+            this.updateTiles();
+        }
+        zoom(e) {
+
+        }
+        onData(e) {
+            if (e.sourceDataType == 'content')
+                this.updateTiles();
+        }
+        updateTiles() {
+            this.sourceCache.update(this.map.painter.transform);
+        }
         onAdd(map, gl) {
             this.map = map;
             this.gl = gl;
-            this.textureSource = new TextureSource(this.source, this.tileJson, this.map, this.gl );
+            map.on('move', this.move.bind(this));
+            map.on('zoom', this.zoom.bind(this));
+
+            map.addSource(this.source, this.tileJson);
+            this.textureSource = this.map.getSource(this.source);
+            this.textureSource.on('data', this.onData.bind(this));
+            this.sourceCache = this.map.style.sourceCaches[this.source];
 
             // !IMPORTANT! hack to make mapbox mark the sourceCache as 'used' so we can use it.
             this.map.style._layers[this.id].source = this.source;
@@ -88,11 +76,11 @@ var Custom = (function (exports) {
         }
         render(gl, matrix) {
             gl.useProgram(this.program);
-            let cache = this.textureSource.sourceCache;
+            let cache = this.sourceCache;
             let visibleTiles = cache.getVisibleCoordinates();
 
             visibleTiles.forEach(tileid => {
-                let tile = this.textureSource.sourceCache.getTile(tileid);
+                let tile = cache.getTile(tileid);
                 if (!tile.texture) return;
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, tile.texture.texture);
@@ -119,6 +107,6 @@ var Custom = (function (exports) {
 
     exports.TextureLayer = TextureLayer;
 
-    return exports;
+    Object.defineProperty(exports, '__esModule', { value: true });
 
-}({}));
+}));

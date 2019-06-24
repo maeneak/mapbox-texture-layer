@@ -3,12 +3,15 @@ mapboxgl.accessToken = 'pk.eyJ1IjoiY3JpdGljYWxtYXNzIiwiYSI6ImNqaGRocXd5ZDBtY2EzN
 const map = new mapboxgl.Map({
     container: document.getElementById('map'),
     //style: 'mapbox://styles/criticalmass/cjvth8ljy0dl01co02owu49ka',
-    style: 'mapbox://styles/mapbox/satellite-streets-v11',
+    style: 'mapbox://styles/mapbox/bright-v8',
     center: [145, -16],
     zoom: 0
 });
 map.on('load', function () {
-    let customlayer = new Custom.TextureLayer({id: 'test', tiles: ['https://nova.criticalmass.com.au:453/mapserver?map=../maps/gfs/uvencode.v001.map&mode=tile&layers=windgl&tilemode=gmap&tile={x} {y} {z}.png']})
-    map.addLayer(customlayer, 'ferry');
+    let customlayer = new mapboxgl.TextureLayer('test', {
+        type: 'raster',
+        tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png']
+    })
+    map.addLayer(customlayer);
 });
 

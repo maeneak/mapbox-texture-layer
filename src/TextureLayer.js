@@ -1,34 +1,50 @@
-import {TextureSource} from './TextureSource';
 import vertexSource from './shaders/raster.vert';
 import fragmentSource from './shaders/raster.frag';
 
 export class TextureLayer {
-    constructor(options) {
+    constructor(id, tileJson, renderCallback, preRenderCallback) {
         this.map = null;
         this.gl = null;
-        this.source = null;
-        this.id = options.id;
+        this.id = id;
+        this.tileSource = null;
+        this.source = this.id + 'Source'
         this.type = 'custom';
-        this.tileUrls = options.tiles;
+        this.tileJson = tileJson;
         this.program = null;
-        this.options = options;
+        this.renderCallback = renderCallback;
+        this.preRenderCallback = preRenderCallback;
+    }
+    move(e) {
+        this.updateTiles();
+    }
+    zoom(e) {
+
+    }
+    onData(e) {
+        if (e.sourceDataType == 'content')
+            this.updateTiles();
+    }
+    updateTiles() {
+        this.sourceCache.update(this.map.painter.transform);
     }
     onAdd(map, gl) {
         this.map = map;
         this.gl = gl;
+        map.on('move', this.move.bind(this));
+        map.on('zoom', this.zoom.bind(this));
 
-        this.source = new TextureSource({
-            id: this.id + 'Source', 
-            tiles: this.tileUrls, 
-            updates: this.update, 
-            tileSize: this.options.tileSize ? this.options.tileSize : 256,
-            map: this.map,
-            gl: this.gl
-        });
+        map.addSource(this.source, this.tileJson);
+        this.tileSource = this.map.getSource(this.source);
+        this.tileSource.on('data', this.onData.bind(this));
+        this.sourceCache = this.map.style.sourceCaches[this.source];
+
+        // !IMPORTANT! hack to make mapbox mark the sourceCache as 'used' so it will initialise tiles.
+        this.map.style._layers[this.id].source = this.source;
 
         const vertexShader = gl.createShader(gl.VERTEX_SHADER);
         gl.shaderSource(vertexShader, vertexSource);
         gl.compileShader(vertexShader);
+
         const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
         gl.shaderSource(fragmentShader, fragmentSource);
         gl.compileShader(fragmentShader);
@@ -40,7 +56,6 @@ export class TextureLayer {
         gl.validateProgram(this.program);
 
         this.program.aPos = gl.getAttribLocation(this.program, "aPos");
-        //this.program.aTexCoord = gl.getAttribLocation(this.program, "aTexCoord");
         this.program.uMatrix = gl.getUniformLocation(this.program, "uMatrix");
         this.program.uTexture = gl.getUniformLocation(this.program, "uTexture");
 
@@ -50,19 +65,14 @@ export class TextureLayer {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, vertexArray, gl.STATIC_DRAW);
     }
-    update() {
-
-    }
     render(gl, matrix) {
-        //this.map.showTileBoundaries = true;
         gl.useProgram(this.program);
+        let cache = this.sourceCache;
+        let visibleTiles = cache.getVisibleCoordinates()
 
-        this.source.visibleTiles
-        //.filter(x => this.source.tileCache[x.key].textureLoaded)
-        //.map(id => this.source.tileCache[id.canonical.key])
-        .forEach(tileid => {
-            let tile = this.source.tileCache[tileid.canonical.key]
-            if (!tile.textureLoaded) return;
+        visibleTiles.forEach(tileid => {
+            let tile = cache.getTile(tileid);
+            if (!tile.texture) return;
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, tile.texture.texture);
 
@@ -75,7 +85,7 @@ export class TextureLayer {
             gl.enableVertexAttribArray(this.program.a_pos);
             gl.vertexAttribPointer(this.program.aPos, 2, gl.FLOAT, false, 0, 0);
 
-            gl.uniformMatrix4fv(this.program.uMatrix, false, this.source.matrixCache[tileid.key]);
+            gl.uniformMatrix4fv(this.program.uMatrix, false, tile.tileID.posMatrix);
             gl.uniform1i(this.program.uTexture, 0);
             gl.depthFunc(gl.LESS);
             //gl.enable(gl.BLEND);
