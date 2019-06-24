@@ -14,19 +14,6 @@ export class TextureLayer {
         this.renderCallback = renderCallback;
         this.preRenderCallback = preRenderCallback;
     }
-    move(e) {
-        this.updateTiles();
-    }
-    zoom(e) {
-
-    }
-    onData(e) {
-        if (e.sourceDataType == 'content')
-            this.updateTiles();
-    }
-    updateTiles() {
-        this.sourceCache.update(this.map.painter.transform);
-    }
     onAdd(map, gl) {
         this.map = map;
         this.gl = gl;
@@ -64,6 +51,19 @@ export class TextureLayer {
         this.vertexBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, vertexArray, gl.STATIC_DRAW);
+    }
+    move(e) {
+        this.updateTiles();
+    }
+    zoom(e) {
+
+    }
+    onData(e) {
+        if (e.sourceDataType == 'content')
+            this.updateTiles();
+    }
+    updateTiles() {
+        this.sourceCache.update(this.map.painter.transform);
     }
     render(gl, matrix) {
         gl.useProgram(this.program);
