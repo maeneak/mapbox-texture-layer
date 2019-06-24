@@ -4,7 +4,7 @@
     (global = global || self, factory(global.mapboxgl = global.mapboxgl || {}));
 }(this, function (exports) { 'use strict';
 
-    var vertexSource = "#define GLSLIFY 1\nattribute vec2 aPos;\nuniform mat4 uMatrix;\nvarying vec2 vTexCoord;\n\nfloat Extent = 8192.0;\n\nvec4 toScreen(vec2 pos) { return vec4(pos.x * Extent, pos.y * Extent, 0, 1); }\n\nvoid main() {\n    vec4 a = uMatrix * toScreen(aPos);\n    gl_Position = vec4(a.rgba);\n    vTexCoord = aPos;\n}\n"; // eslint-disable-line
+    var vertexSource = "#define GLSLIFY 1\nattribute vec2 aPos;\nuniform mat4 uMatrix;\nvarying vec2 vTexCoord;\n\nfloat Extent = 8192.0;\n\nvoid main() {\n    vec4 a = uMatrix * vec4(aPos * Extent, 0, 1);\n    gl_Position = vec4(a.rgba);\n    vTexCoord = aPos;\n}\n"; // eslint-disable-line
 
     var fragmentSource = "precision mediump float;\n#define GLSLIFY 1\nvarying vec2 vTexCoord;\nuniform sampler2D uTexture;\nvoid main() {\n    vec4 color = texture2D(uTexture, vTexCoord);\n\n    gl_FragColor = vec4(1.0 - color.r, 1.0 - color.g, 1.0 - color.b, 1);\n}           \n"; // eslint-disable-line
 
