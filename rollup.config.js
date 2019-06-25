@@ -1,8 +1,6 @@
 import resolve from 'rollup-plugin-node-resolve';
 import commonjs from 'rollup-plugin-commonjs';
 import flowRemoveTypes from '@mapbox/flow-remove-types';
-import glslify from 'rollup-plugin-glslify';
-import minify from "rollup-plugin-babel-minify";
 
 export default [{
     input: 'src/TextureLayer.js',
@@ -37,9 +35,7 @@ export default [{
         }),
         commonjs({
             ignoreGlobal: true
-        }),
-        glslify({ basedir: 'src/shaders' })
-        //,minify()
+        })
     ]
   }]
 

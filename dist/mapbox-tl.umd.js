@@ -4,9 +4,6 @@
     (global = global || self, factory(global.mapboxgl = global.mapboxgl || {}));
 }(this, function (exports) { 'use strict';
 
-    //import vertexSource from './shaders/raster.vert';
-    //import fragmentSource from './shaders/raster.frag';
-
     class TextureLayer {
         constructor(id, tileJson, onAddCallback, renderCallback, preRenderCallback) {
             this.map = null;
