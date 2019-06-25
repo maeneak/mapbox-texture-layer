@@ -6,27 +6,40 @@ import minify from "rollup-plugin-babel-minify";
 
 export default [{
     input: 'src/TextureLayer.js',
-    output: [{
-      file: 'dist/mapbox-texture-layer.js',
-      format: 'cjs'
-    },{
-      entry: './src/TextureLayer.js',
-      file: 'demo/mapbox-texture-layer.js',
-      format: 'umd',
-      name: 'mapboxgl',
-      extend: true
-    }],
-    plugins: [ 
+    output: [
+      {
+        file: 'dist/mapbox-tl.esm.js',
+        format: 'esm'
+      },
+      {
+        file: 'dist/mapbox-tl.cjs.js',
+        format: 'cjs'
+      },
+      {
+        entry: './src/TextureLayer.js',
+        file: 'dist/mapbox-tl.umd.js',
+        format: 'umd',
+        name: 'mapboxgl',
+        extend: true
+      },
+      {
+        entry: './src/TextureLayer.js',
+        file: 'demo/mapbox-tl.umd.js',
+        format: 'umd',
+        name: 'mapboxgl',
+        extend: true
+      }],
+      plugins: [ 
         flow(),
         resolve({
           browser: true,
           preferBuiltins: false
-      }),
-      commonjs({
-          ignoreGlobal: true
-      }),
-      glslify({ basedir: 'src/shaders' })
-      //,minify()
+        }),
+        commonjs({
+            ignoreGlobal: true
+        }),
+        glslify({ basedir: 'src/shaders' })
+        //,minify()
     ]
   }]
 
