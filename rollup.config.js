@@ -1,6 +1,5 @@
 import resolve from 'rollup-plugin-node-resolve';
 import commonjs from 'rollup-plugin-commonjs';
-import flowRemoveTypes from '@mapbox/flow-remove-types';
 
 export default [{
     input: 'src/TextureLayer.js',
@@ -28,7 +27,6 @@ export default [{
         extend: true
       }],
       plugins: [ 
-        flow(),
         resolve({
           browser: true,
           preferBuiltins: false
@@ -38,13 +36,3 @@ export default [{
         })
     ]
   }]
-
-  export function flow() {
-    return {
-        name: 'flow-remove-types',
-        transform: (code) => ({
-            code: flowRemoveTypes(code).toString(),
-            map: null
-        })
-    };
-}
