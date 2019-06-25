@@ -22,7 +22,12 @@ var fragmentSource = `
 
         gl_FragColor = vec4(1.0 - color.r, 1.0 - color.g, 1.0 - color.b, 1);
     }           
-`
+    // void main() {
+    //     vec2 cen = vec2(0.5,0.5) - vTexCoord;
+    //     vec2 mcen = -0.07* log(length(cen))* normalize(cen);
+    //     gl_FragColor = texture2D(uTexture, vTexCoord-mcen);
+    //  }
+     `
 const map = new mapboxgl.Map({
     container: document.getElementById('map'),
     style: 'mapbox://styles/mapbox/empty-v8',
@@ -36,14 +41,14 @@ map.on('load', () => {
             type: 'raster',
             tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png']
         },
-        onAdd,
+        setupLayer,
         render
     );
     map.addLayer(customlayer);
 });
 
 var program = {};
-function onAdd(map, gl) {
+function setupLayer(map, gl) {
     const vertexShader = gl.createShader(gl.VERTEX_SHADER);
     gl.shaderSource(vertexShader, vertexSource);
     gl.compileShader(vertexShader);
