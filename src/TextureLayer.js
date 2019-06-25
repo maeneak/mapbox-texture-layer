@@ -1,5 +1,3 @@
-//import vertexSource from './shaders/raster.vert';
-//import fragmentSource from './shaders/raster.frag';
 
 export class TextureLayer {
     constructor(id, tileJson, onAddCallback, renderCallback, preRenderCallback) {
