@@ -39,7 +39,8 @@ map.on('load', () => {
         'test', 
         {
             type: 'raster',
-            tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png']
+            tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
+            attribution: '<a href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a>'
         },
         setupLayer,
         render
