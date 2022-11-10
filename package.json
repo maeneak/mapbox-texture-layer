@@ -1,8 +1,9 @@
 {
   "name": "mapboxgl-texture-layer",
-  "version": "0.1.0",
-  "description": "",
-  "private": true,
+  "version": "0.0.1",
+  "description": "Custom mapbox-gl layer, using a raster tile source and custom shaders.",
+  "main": "dist/mapbox-tl.cjs.js",
+  "module": "dist/mapbox-tl.esm.js",
   "scripts": {
     "build": "rollup -c",
     "serve": "npm run build && npx serve demo"
