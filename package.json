@@ -4,7 +4,8 @@
   "description": "",
   "private": true,
   "scripts": {
-    "build": "rollup -c"
+    "build": "rollup -c",
+    "serve": "npm run build && npx serve demo"
   },
   "keywords": [],
   "author": "Scott Cappellani",

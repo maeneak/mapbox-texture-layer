@@ -90,7 +90,7 @@ function render(gl, matrix, tiles) {
         gl.enableVertexAttribArray(program.a_pos);
         gl.vertexAttribPointer(program.aPos, 2, gl.FLOAT, false, 0, 0);
 
-        gl.uniformMatrix4fv(program.uMatrix, false, tile.tileID.posMatrix);
+        gl.uniformMatrix4fv(program.uMatrix, false, tile.tileID.projMatrix);
         gl.uniform1i(program.uTexture, 0);
         gl.depthFunc(gl.LESS);
         //gl.enable(gl.BLEND);
